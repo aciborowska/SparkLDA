@@ -1,0 +1,46 @@
+% + Software development is an iterative process consisting of many different types of activities performed everyday by developers…
+% + Why do we need to automatically detect the activity of the developer? What is the value of that?
+% +++ Recommendation systems for software engineering are a group of tools that aims to provide a developer with a valuable information based on a context that he is currently working on [Robillard, 2010]. Researches…
+% + Briefly mention Katja’s work and the work of others towards automatic activity detection -- i.e. what is the state of the art?
+% + How do we improve on the state of the art in this paper? List the contributions of the paper in a bulleted list
+% +++ Model combining code features with information about developer interaction within an IDE …
+% +++ Unsupervised approach
+
+
+
+
+\section{Introduction}
+
+As software continues to grow in size and complexity, software developers need to recall numerous and heterogeneous
+fragments of information to effectively perform their daily work. Such information is often scattered across internal (e.g. program
+elements, documentation, tests) and external resources (e.g. Q\&A forums, tutorials, blog posts).
+Locating, understanding, and remembering relevant artifacts, like project classes and methods,
+prior issue reports, and API documentation imposes a significant cognitive burden on
+developers~\cite{ko_information_2007,ko_howdevs_2006,robillard2015recommending}.  Recommendation systems that aid
+software developers by suggesting relevant artifacts are a natural solution to this problem, but have yet
+to become prevalent or gain wide adoption by developers. Recommendation systems in software engineering are distinct from their general-purpose counterparts in that they are highly task dependent~\cite{robillard2014recommendation,zou2012industrial,coman2008automated}. The task of the developer, e.g. fixing a specific bug or implementing a specific feature, is a key component of recommendation context, relating to each other groups of program elements, commands, documentation, etc. that are necessary for task completion or can improve
+efficiency~\cite{gasparic,ying_task}. At a finer granularity, the activity of a developer, e.g. debugging, running tests, navigating code, etc., provides
+further important context to better target recommendations~\cite{kevic,meyer2017work}.
+
+The state of the art in automated developer activity detection has focused on a single dimension of the available data. For example, detecting
+activities from source code accesses over time and recommending program elements~\cite{kevic} or detecting latent activities from a stream of IDE commands and events and recommending the same~\cite{murphy-hill_improving_2012,predicting_damevski_2018}. While using a single dimension of interaction data is effective, there are opportunities
+in leveraging several dimensions together. In this paper, we propose a technique for {\em joint modeling
+of source code accesses and IDE interactions that uses both data dimensions to improve the quality of activity
+detection and the activity-aware recommendation of artifacts}.
+
+Researchers have performed several studies to determine a de facto set of activities used in software
+maintenance~\cite{kevic,meyer2017work,amann,latoza}. However, the mapping between pre-determined activities by
+researchers and those exhibited by a set of developers in the field is likely to be imperfect, as developer work
+styles have been observed to have strong personal variations~\cite{kevic,meyer2017work}. One of the strengths of the
+approach described in this paper is that it does not require a pre-determined, fixed set of activities, instead, allowing for the number of activities to be inferred based on the developers' interactions.
+Another advantage of the described approach is that it is unsupervised and therefore does not require labeled data, which is hard to obtain at scale and from a sufficiently diverse set of developers. A supervised model would have
+a tendency to overfit the behavior of the individuals or groups present in the labeled training data, exemplified by the fact that such models consistently produce best results when trained and tested solely on one individual's interaction data. To summarize, the contributions of this paper are:
+
+\begin{itemize}
+\item unsupervised approach that combines IDE interactions and source code accesses to build statistical representations of developer activity;
+\item approach that does not require as input the specification of the number of type of developer activities;
+\item evaluation of the accuracy of the approach in determining activities;
+\item simulation-based evaluation of the effectiveness of the approach when used as part of a developer recommendation system.
+\end{itemize}
+
+The organization of this paper is as follows. Section~\ref{sec:related} outlines the related work for this particular problem domain, while Section~\ref{sec:dev-data} contains a description of the interaction dataset we used and the features we computed to represent IDE commands and source code accesses. In Section~\ref{sec:model} we define the statistical model and its hyperparameters. Section~\ref{sec:eval-plan} describes the plan for evaluating the model and the tuning of the model hyperparameters, while Section~\ref{sec:results} provides the results compared to baseline techniques. Finally, in Section~\ref{sec:conclusions} we conclude the paper and list our plans for future work.

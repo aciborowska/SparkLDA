@@ -1,0 +1,106 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{array}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Distributed Collapsed Gibbs Sampling for LDA on Spark}
+
+\author{\IEEEauthorblockN{Agnieszka Ciborowska}\\
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Virginia Commonwealth University}}}
+
+
+\maketitle
+
+\begin{abstract}
+The report describes a collapsed Gibbs sampling method for widely-used latent Dirichlet allocation (LDA) model on Spark.
+\end{abstract}
+
+% Note that keywords are not normally used for peerreview papers.
+\begin{IEEEkeywords}
+Spark, LDA, collapsed Gibbs sampling
+\end{IEEEkeywords}
+
+
+\section{Introduction}
+Information hidden in very large datasets, such as document texts or images, has became a rapidly growing interest of researches as it provides ability to...
+
+The latent Dirichlet allocation model, proposed by Blei et al.~\cite{blei2003latent}, is a three-level hierarchical Bayesian model designed to discover latent topics in document corpora. The main idea of the model is to represent each document as a random mixture of topics, where each topic is, in turn, modeled by a distribution over words. 
+
+\section{Latent Dirichlet Allocation}
+Before describing the detail of the distributed LDA model, I briefly review the standard LDA model. LDA models each of $D$ documents as a mixture over $K$ latent topics, where each topic is a multinomial probability distribution over a vocabulary of $V$ words. Generative process of a new document $j$ can be characterized as follows:
+\begin{itemize}
+\item draw a mixing proportion $\theta_{k|j}$ from a Dirichlet with parameter $\alpha$
+\item for the $i^{th}$ word in the document, first draw a topic assignment $z_{ij}$, where topic $k$ is chosen with probability of $\theta_{k|j}$, and then value $w$ of word $x_{ij}$ is drawn from the $z_{ij}$ topic with probability $\phi_{w|k}$, where $\phi_{w|k}$ is drown from a Dirichlet prior with parameter $\beta$.
+\end{itemize}
+The above description of the generative process is equivalent to:
+$$
+\theta_{k|j}\sim Dir(\alpha) \quad \phi_{w|k}\sim Dir(\beta) \quad  z_{ij}\sim \theta_{k|j} \quad  x_{ij}\sim \phi_{w|z_{ij}}
+$$
+where $\alpha$ and $\beta$ are fixed priors that influence smoothness of the model. The graphical representation of the LDA model is presented on Fig.~\ref{fig:lda}.
+\begin{figure}
+\centering
+\includegraphics[scale=0.9]{plots/LDA.pdf}
+\caption{Graphical model for LDA}
+\label{fig:lda}
+\end{figure}
+
+Given the observed words $\texttt{x}=x_{\{ij\}}$, the task is to compute the posterior distribution over the latent variables $\texttt{z}$, $\theta$ and $\phi$. An accurate inference procedure, proposed by Griffiths and Steyvers\cite{griffiths2004finding}, is a collapsed Gibbs sampling, which samples the latent variable $\texttt{z}$ with $\theta$ and $\phi$ integrated out, what allows to increase the convergence rate. The conditional probability of $z_{ij}$ is given by:
+$$
+p(z_{ij}=k|z^{\lnot ij}, x, \alpha, \beta) = \dfrac{c_{k,m,\cdot} + \alpha}{N_{j}^{\lnot i}+K\alpha} \frac{c_{k,\cdot,n} + \beta}{c_{k,\cdot,\cdot} + V\beta}
+$$ 
+where $\not ij$ denotes word $i$ in document $j$ that is excluded in the count value and $c_{k,m,n}$ denotes number of time topic $k$ is assigned to word $n$ in document $m$.
+
+\section{Distributed inference for LDA}
+
+\section{Experiments}
+
+\subsection{Quantitative evaluation}
+\subsection{Qualitative evaluation}
+
+
+
+
+%\begin{figure*}[!t]
+%\centering
+%\subfloat[Case I]{\includegraphics[width=2.5in]{box}%
+%\label{fig_first_case}}
+%\hfil
+%\subfloat[Case II]{\includegraphics[width=2.5in]{box}%
+%\label{fig_second_case}}
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure*}
+
+
+\section{Conclusion}
+The conclusion goes here.
+
+\bibliographystyle{IEEEtran}
+\bibliography{IEEEabrv,paper}
+
+%\vfill
+
+% Can be used to pull up biographies so that the bottom of the last one
+% is flush with the other column.
+%\enlargethispage{-5in}
+
+
+
+% that's all folks
+\end{document}
+
+
