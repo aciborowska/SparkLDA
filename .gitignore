@@ -2,7 +2,7 @@
 *.log
 *.aux
 *.bbl
-*.pdf
+paper.pdf
 *.gz
 *.blg
 
