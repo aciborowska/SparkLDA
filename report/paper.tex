@@ -119,9 +119,13 @@ Implementation of a sequential collapsed Gibbs sampler for LDA is straightforwar
 
 \section{Distributed inference for LDA}
 \label{sec:slda}
-Although LDA with collapsed Gibbs sampling has been in common use, due to its high computational complexity, this method it not applicable for processing large document corpora. Additionally, obtaining the speedup through paralellization is not trivial as collapsed Gibbs sampling is a strictly sequential process that uses the current state of all but one variable to sample new topic assignment $z_{ij}$. To distribute the computations, this study follows the approach proposed by Newman et al.\cite{newman2009distributed} and assumes that since number of words in a document is typically larger than number of cores, the dependency between topic assignment $z_{ij}$ and $z_{i'j'}$ is weak, thus the sequential sampling requirement can be relaxed and the LDA model can be trained and tested in a distributed environment.
+Although LDA with collapsed Gibbs sampling has been in common use, due to its high computational complexity, this method it not applicable for processing large document corpora. Additionally, obtaining the speedup through paralellization is not trivial as collapsed Gibbs sampling is a strictly sequential process that uses the current state of all but one variable to sample new topic assignment $z_{ij}$. This section introduces an approximate collapsed Gibbs sampling procedure for LDA, where data is distributed over distinct processors on Spark.
 
-\subsection{Approximate LDA on Spark}
+\subsection{Distributed LDA on Spark}
+To distribute the computations, this study follows the hypothesis proposed by Newman et al.\cite{newman2009distributed} and assumes that since the number of words in a document is typically larger than the number of processors, the dependency between topic assignment $z_{ij}$ and $z_{i'j'}$ is weak, thus the sequential sampling requirement can be relaxed and the LDA model can be trained and tested in a distributed environment. 
+
+The main idea of Spark-LDA algorithm is shown in Algorithm~\ref{alg2}. After random initialization, each document $d$ is mapped to a record containing document identifier, sparse bag-of-words representation of the document's content and the count value of $c_{k,d,\cdot}$ corresponding to the document $d$. Next, the set of processed $D$ documents is distributed over $P$ partitions using standard Spark partitioning scheme with hashing function. Finally, regular LDA procedure with collapsed Gibbs sampling is performed in parallel across all the partitions, independently for each document, updating topic assignments $\textbf{z}$.  Note, that distributing the count values can be done only for the $c_{k,m,\cdot}$ as it contains document-related counts, while the count values $c_{k,\cdot,n}$ and $c_{k,\cdot,\cdot}$ cannot be partitioned as they refer to the state of the model as a whole. Thus, $c_{k,\cdot,n}$ and $c_{k,\cdot,\cdot}$ are broadcasted to all the nodes and their local copies are used during distributed sampling procedure. Every $n^{th}$ iteration, the count values $c_{k,\cdot,n}$ and $c_{k,\cdot,\cdot}$ are recalculated through reduce procedure on $\textbf{z}$ and broadcasted to the nodes. Iteration interval between the update of the global count values, $n$, is one of the model parameters.
+
 
  \begin{algorithm}
 \caption{Distributed LDA with collapsed Gibbs sampling}
@@ -129,15 +133,19 @@ Although LDA with collapsed Gibbs sampling has been in common use, due to its hi
 \begin{algorithmic}
 \scriptsize
 \State \textbf{begin}
+\State $documents \leftarrow $ map($d$: id, $d$.bow, $c_{k,m,\cdot}[d]$)
 \State randomly initialize $\textbf{z}$ and increment the count values
 \State update global counts $c_{k,\cdot,n}$, $c_{k,\cdot,\cdot}$
 \State divide $D$ documents into $p$ partitions
  \ForAll  {$i = 0 \rightarrow iterations - 1$}
+   \State broadcast global counts $c_{k,\cdot,n}$, $c_{k,\cdot,\cdot}$
    \ForAll  {partition $p$ in parallel}
    	  \State copy global counts $c_{k,\cdot,n}$, $c_{k,\cdot,\cdot}$
-   	  \State perform LDA($D_p$)
+   	  \State perform LDA($D_p$, $\textbf{z}$)
    \EndFor
-   \State update global counts $c_{k,\cdot,n}$, $c_{k,\cdot,\cdot}$
+   \State $\textbf{z} \leftarrow collect()$
+   \State update global $c_{k,\cdot,n} \leftarrow\textbf{z}.reduce()$
+   \State update global $c_{k,\cdot,\cdot} \leftarrow\textbf{z}.reduce()$
   \EndFor
 \State \textbf{end}
 \end{algorithmic}
@@ -146,28 +154,47 @@ Although LDA with collapsed Gibbs sampling has been in common use, due to its hi
 
 \section{Experiments}
 \label{sec:exp}
+In this section, I present and analyze the result of the evaluation of the Spark-LDA model effectiveness. The section starts with comparing the performance of distributed and sequential LDA models, followed by studying the influence of the \textit{interval between updates} parameter on the model effectiveness.
+
+\subsection{Datasets}
+Experiments were performed using two datasets available on Kaggle: ABC News Headlines and NIPS papers. Due to time and resource limitation, the experiments were  conducted using a subset of each dataset. In the case of ABC News headlines, a subset containing 1000 documents was created (ABC News headlines S), while from NIPS papers I extracted all not missing abstracts (NIPS abstracts). Note that for one of the experiments, full ABC News headlines dataset was employed, and to ease to readability, it will be further referred as ABC News headlines F. After tokenization and stopwords removal, each dataset was filtered for $n$ most frequent words. Note that the value of $n$ was determined experimentally, to assure that the runtime was reasonable taking into account time restrictions. The characteristics of the datasets are presented in Table~\ref{tab:datasets}.
 
 
+\renewcommand{\arraystretch}{1.2}
+\begin{table*}[t]
+\centering
+\caption{Parameters of the datasets used during experiments.}
+\label{tab:datasets}
+\begin{tabular}{lrrr} \toprule
+Dataset                   & \multicolumn{1}{c}{ABC News headlines S} & \multicolumn{1}{c}{ABC News headlines F} & \multicolumn{1}{c}{NIPS abstracts} \\ \midrule
+Number of documents       & 1000                                     & 1103665                                  & 3924                               \\
+Number of distinct tokens & 176                                      & 428                                      & 1488                               \\
+Total number of words     & 836                                      & 1996001                                  & 123379    \\ \bottomrule                        
+\end{tabular}
+\end{table*}
 
 
+\subsection{Metrics}
+Models performance is assessed according to two aspects: the quality of the model learned, expressed by a perplexity, and the execution time.
+\subsection{Perplexity}
 \begin{figure*}[t]
 \centering
-\subfloat[ABC news headlines dataset.]{\includegraphics[scale=0.44]{plots/perplexity1.pdf}%
+\subfloat[ABC News headlines S]{\includegraphics[scale=0.4]{plots/perplexity1.pdf}%
 \label{fig:perplex2}}
-\hfil
-\subfloat[NIPS abstracts dataset.]{\includegraphics[scale=0.44]{plots/perplexity2.pdf}%
+\subfloat[NIPS abstracts]{\includegraphics[scale=0.4]{plots/perplexity2.pdf}%
 \label{fig:perplex2}}
 \caption{Perplexity during training for different number of topics.}
 \label{fig_sim}
 \end{figure*}
+\subsection{Execution time}
 
-\renewcommand{\arraystretch}{1.3}
+\renewcommand{\arraystretch}{1.2}
 
 \begin{table*}[t]
 \centering
 \caption{Execution time in seconds and speedup achieved by Spark-LDA with respect to different number of topics.}
 \begin{tabular}{lrrrrrrr} \toprule
-                 & \multicolumn{3}{c}{\textbf{ABC News headlines}} & \multicolumn{3}{c}{\textbf{NIPS abstracts}}        & \multicolumn{1}{c}{\textbf{ABC News headlines (full)}} \\
+                 & \multicolumn{3}{c}{\textbf{ABC News headlines S}} & \multicolumn{3}{c}{\textbf{NIPS abstracts}}        & \multicolumn{1}{c}{\textbf{ABC News headlines F}} \\
                  & K = 5             & K = 10           & K = 20           & K = 5           & K = 10          & K = 20         & K = 2                                           \\ \midrule
 LDA              & 47,80             & 51,59            & 57,41            & 1 729,06        & 1 779,65        & 2 002,13       & 32 577,60                                       \\
 Spark-LDA        & 117,27            & 126,82           & 143,06           & 128,03          & 159,32          & 207,01         & 3 929,08                                        \\ \midrule
@@ -176,21 +203,23 @@ Spark-LDA        & 117,27            & 126,82           & 143,06           & 128
 \label{tab:speedup}
 \end{table*}
 
+\subsection{Interval between updates}
+
 \begin{figure*}[t]
 \centering
-\subfloat[ABC News headlines dataset.]{\includegraphics[scale=0.5]{plots/update_abc.pdf}%
+\subfloat[ABC News headlines S]{\includegraphics[scale=0.43]{plots/update_abc.pdf}%
 \label{fig:param_abc}}
 \hfil
-\subfloat[NIPS abstracts dataset.]{\includegraphics[scale=0.5]{plots/update_abstract.pdf}%
+\subfloat[NIPS abstracts]{\includegraphics[scale=0.43]{plots/update_abstract.pdf}%
 \label{fig:param_nips}}
-\caption{Perplexity during training Spark-LDA for different interval between parameter updates .}
+\caption{Perplexity during training Spark-LDA for different interval between parameter updates.}
 \label{fig_sim}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[scale=0.7]{plots/param_update.pdf}
-\caption{Execution time of Spark-LDA on ABC News headlines (left) and NIPS abstracts (right) with respect to interval between global parameters update.}
+\includegraphics[scale=0.6]{plots/param_update.pdf}
+\caption{Execution time of Spark-LDA on ABC News headlines S(left) and NIPS abstracts (right) with respect to the \textit{interval between updates} parameter.}
 \label{fig_sim}
 \end{figure*}
 
