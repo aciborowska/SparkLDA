@@ -85,30 +85,15 @@ where $\lnot ij$ denotes word $i$ in document $j$ that is excluded in the count 
 
 Implementation of a sequential collapsed Gibbs sampler for LDA is straightforward as it operates on a set of count values, $c_{k,\cdot,m}$, $c_{k,m,\cdot}$ and $c_{k,\cdot,\cdot}$. The algorithm starts by randomly assigning a topic to a word in a  document, updating the count values accordingly, and performs loop over the number of iterations to reassign a topic to a word according to the conditional probability. The outline of LDA collapsed Gibbs sampling is presented in Algorithm \ref{alg}.
  \begin{algorithm}
-\caption{LDA with collapsed Gibbs sampling}
+\caption{Gibbs sampling}
 \label{alg}
 \begin{algorithmic}
 \scriptsize
-\Require set of $D$ documents
-\Ensure topics assignments $\textbf{z}$ and the count values $c_{k,m,\cdot}$, $c_{k,\cdot,n}$, $c_{k,\cdot,\cdot}$
+\Require latent variable $z^{(0)} = \langle z_1^{(0)},...,z_k^{(0)}\rangle$
 \State \textbf{begin}
-\State randomly initialize $\textbf{z}$ and increment the count values
-   \ForAll  {$i = 0 \rightarrow iterations - 1$}
-      \ForAll  {$d$ in $D$}
-         \ForAll  {$word$ in $d$}
-            \State $ topic \rightarrow z[d, word]$
-            \State $c_{topic,d,\cdot} -= 1$
-            \State $c_{topic,\cdot,word}-=1$
-            \State $c_{topic,\cdot,\cdot}-=1$
-            \ForAll {$k = 0 \rightarrow K-1$}
-            	\State $p(z_{word,d}=k|\cdot) = \dfrac{c_{k,d,\cdot} + \alpha}{N_{d}^{\lnot i}+K\alpha} \frac{c_{k,\cdot,word} + \beta}{c_{k,\cdot,\cdot} + V\beta}$
-            \EndFor
-            \State $topic \leftarrow$ sample from $p(z|\cdot)$
-            \State $z[d, word] \leftarrow topic $
-            \State $c_{topic,d,\cdot} += 1$
-            \State $c_{topic,\cdot,word} +=1$
-            \State $c_{topic,\cdot,\cdot}+=1$
-		 \EndFor            
+   \ForAll  {$t = 1 $ to $T$}
+      \ForAll  {$i = 1$ to $k$}
+         \State $z^{(t+1)}_i \sim P(Z_i | z_1^{(t+1)},...,z_{i-1}^{(t+1)},z_{i+1}^{(t)},...,z_k^{(t)})$
       \EndFor 
    \EndFor
 \State \textbf{end}
@@ -165,7 +150,7 @@ Experiments were performed using two datasets available on Kaggle: ABC News Head
 \begin{tabular}{lrrr} \toprule
 Dataset                   & \multicolumn{1}{c}{ABC News headlines S} & \multicolumn{1}{c}{ABC News headlines F} & \multicolumn{1}{c}{NIPS abstracts} \\ \midrule
 Number of documents       & 1000                                     & 1103665                                  & 3924                               \\
-Number of distinct tokens & 176                                      & 428                                      & 1488                               \\
+Number of distinct tokens & 1488                                      & 428                                      & 176                               \\
 Total number of words     & 836                                      & 1996001                                  & 123379    \\ \bottomrule                        
 \end{tabular}
 \end{table*}

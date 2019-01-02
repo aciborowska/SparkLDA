@@ -5,4 +5,7 @@
 paper.pdf
 *.gz
 *.blg
+/SparkLDA/venv
+/SparkLDA/__pycache__
+/SparkLDA/.idea
 
